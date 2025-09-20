@@ -1,9 +1,10 @@
 {
   "expo": {
-    "name": "pizuna-app",
+    "name": "Pizuna",
     "slug": "pizuna-app",
     "version": "1.0.0",
     "orientation": "portrait",
+    "scheme": "pizuna",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -13,17 +14,32 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pizuna.app",
+      "googleServicesFile": "./ios/GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.pizuna.app",
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      "@react-native-firebase/messaging"
+    ],
+    "extra": {
+      "apiBase": "https://666167856e63.ngrok-free.app",
+      "eas": {
+        "projectId": "215dd6c1-d53b-406a-870c-a5f1dc67e45e"
+      }
     }
   }
 }
