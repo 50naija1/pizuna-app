@@ -11,25 +11,17 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#12152b"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pizuna.app",
       "googleServicesFile": "./ios/GoogleService-Info.plist"
-
-"android": {
-  "package": "com.pizuna.app",
-  "googleServicesFile": process.env.GOOGLE_SERVICES_JSON,
-  ...
-}
-
-
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0f143b"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.pizuna.app",
@@ -41,7 +33,8 @@
     "plugins": [
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
-      "@react-native-firebase/messaging"
+      "@react-native-firebase/messaging",
+      "expo-localization"
     ],
     "extra": {
       "apiBase": "https://666167856e63.ngrok-free.app",

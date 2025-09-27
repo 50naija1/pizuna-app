@@ -1,62 +1,219 @@
-// screens/AuthScreen.js
-import React, { useState, useEffect } from 'react';
-import { View, TextInput, Button, StyleSheet, Text, Alert, Platform } from 'react-native';
-import { api, setToken } from '../lib/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  Button,
+  Text,
+  Alert,
+  ActivityIndicator,
+  TouchableOpacity,
+  StyleSheet,
+  Animated,
+  Easing,
+} from 'react-native';
+import PhoneInput from 'react-native-phone-number-input';
+import OTPTextView from 'react-native-otp-textinput';
+import { loginWithPhone, confirmOTP } from '../lib/auth';
 
 export default function AuthScreen({ navigation }) {
+  const phoneInput = useRef(null);
+  const otpInput = useRef(null); // ref for clearing OTP
+
   const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [formattedPhone, setFormattedPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [confirmation, setConfirmation] = useState(null);
 
-  useEffect(() => {
-    // auto-login if token exists
-    (async () => {
-      const token = await AsyncStorage.getItem('pizuna_token');
-      if (token) {
-        // optional: validate token by hitting /api/users/me if you add that endpoint
-        navigation.replace('Contacts');
-      }
-    })();
-  }, []);
+  const [status, setStatus] = useState(null); // null | "loading" | "success" | "error"
 
-  const onSubmit = async () => {
+  // Animations
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  const [resendTimer, setResendTimer] = useState(0);
+
+  const startResendTimer = () => {
+    setResendTimer(30);
+    const interval = setInterval(() => {
+      setResendTimer((t) => {
+        if (t <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+  };
+
+  const handleSendOTP = async () => {
+    if (!phoneInput.current?.isValidNumber(phone)) {
+      return Alert.alert('Invalid phone', 'Enter a valid phone number.');
+    }
+
     try {
-      if (!phone) return Alert.alert('Phone required', 'Enter a phone number in E.164 format, e.g. +234801xxxxxxx');
-      setLoading(true);
-      // Demo auth endpoint on server: POST /api/auth/demo { phone, name }
-      const res = await api.post('/api/auth/demo', { phone: phone.trim(), name: name.trim() });
-      const { token, user } = res.data;
-      await setToken(token);
-      navigation.replace('Contacts', { user });
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Auth error', err.response?.data || err.message || 'Failed to sign in');
-    } finally {
-      setLoading(false);
+      const confirmationResult = await loginWithPhone(formattedPhone);
+      setConfirmation(confirmationResult);
+      Alert.alert('OTP sent!', `Check your phone (${formattedPhone}) for the code.`);
+      startResendTimer();
+    } catch (e) {
+      Alert.alert('Error', e.message || 'Failed to send OTP');
+    }
+  };
+
+  const runShake = () => {
+    shakeAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 6, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -6, duration: 50, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const handleVerifyOTP = async (code = otp) => {
+    if (code.length < 6) {
+      return Alert.alert('Invalid code', 'OTP must be 6 digits.');
+    }
+
+    try {
+      setStatus('loading');
+      if (!confirmation) return Alert.alert('Error', 'No OTP sent yet');
+      await confirmOTP(confirmation, code);
+
+      // Success → fade in ✅
+      setStatus('success');
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start(() => {
+        setTimeout(() => navigation.replace('Contacts'), 800);
+      });
+    } catch (e) {
+      // Error → ❌ + shake + auto-clear
+      setStatus('error');
+      runShake();
+
+      // Clear OTP input + reset state
+      otpInput.current?.clear();
+      setOtp('');
+
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        setTimeout(() => {
+          setStatus(null);
+          fadeAnim.setValue(0);
+        }, 1200);
+      });
+
+      Alert.alert('Error', e.message || 'Invalid OTP');
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.h}>Pizuna — demo sign in</Text>
-      <TextInput
-        placeholder="+2348010..."
-        keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'phone-pad'}
-        style={styles.input}
-        value={phone}
-        onChangeText={setPhone}
-      />
-      <TextInput placeholder="Your name" style={styles.input} value={name} onChangeText={setName} />
-      <Button title={loading ? 'Signing in...' : 'Sign in (demo)'} onPress={onSubmit} disabled={loading} />
-      <Text style={styles.note}>This demo flow creates a user by phone locally. Replace with Firebase/Twilio for real OTP.</Text>
+      <Text style={styles.title}>
+        {confirmation ? 'Verify your code' : 'Enter your phone number'}
+      </Text>
+
+      <View style={styles.card}>
+        {!confirmation ? (
+          <>
+            <PhoneInput
+              ref={phoneInput}
+              defaultCode="NG"
+              layout="first"
+              value={phone}
+              onChangeText={(text) => setPhone(text)}
+              onChangeFormattedText={(text) => setFormattedPhone(text)}
+              autoFocus
+              containerStyle={styles.phoneInputContainer}
+              textContainerStyle={styles.textContainer}
+            />
+
+            <Button title="Send OTP" onPress={handleSendOTP} />
+          </>
+        ) : (
+          <>
+            <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
+              <OTPTextView
+                ref={otpInput}
+                handleTextChange={(val) => {
+                  setOtp(val);
+                  if (val.length === 6) {
+                    handleVerifyOTP(val);
+                  }
+                }}
+                inputCount={6}
+                keyboardType="number-pad"
+                autoFocus
+                containerStyle={styles.otpContainer}
+                textInputStyle={styles.otpInput}
+              />
+            </Animated.View>
+
+            {/* Loader + Status feedback */}
+            {status === 'loading' && (
+              <ActivityIndicator size="large" color="#1a73e8" style={{ marginTop: 15 }} />
+            )}
+
+            {status === 'success' && (
+              <Animated.Text style={[styles.statusIcon, { opacity: fadeAnim }]}>
+                ✅
+              </Animated.Text>
+            )}
+
+            {status === 'error' && (
+              <Animated.Text style={[styles.statusIcon, { opacity: fadeAnim, color: 'red' }]}>
+                ❌
+              </Animated.Text>
+            )}
+
+            {/* fallback button */}
+            <Button title="Verify OTP" onPress={() => handleVerifyOTP()} disabled={status === 'loading'} />
+
+            {resendTimer > 0 ? (
+              <Text style={styles.resendText}>Resend available in {resendTimer}s</Text>
+            ) : (
+              <TouchableOpacity onPress={handleSendOTP} style={{ marginTop: 10 }}>
+                <Text style={styles.resendLink}>Resend OTP</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex:1, padding:16, justifyContent:'center' },
-  input: { borderWidth:1, borderColor:'#ddd', padding:12, marginVertical:8, borderRadius:6 },
-  h: { fontSize:20, marginBottom:12, textAlign:'center' },
-  note: { marginTop:12, color:'#666', fontSize:12, textAlign:'center' }
+  container: { flex: 1, padding: 20, justifyContent: 'flex-end', backgroundColor: '#fff' },
+  title: { fontSize: 20, textAlign: 'center', marginBottom: 'auto', marginTop: 60, fontWeight: '500' },
+  card: { padding: 20, borderRadius: 12, backgroundColor: '#f9f9f9', elevation: 4 },
+  phoneInputContainer: {
+    width: '100%',
+    height: 60,
+    marginBottom: 15,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  textContainer: { paddingVertical: 0, borderRadius: 8, backgroundColor: '#fff' },
+  otpContainer: { marginVertical: 15, justifyContent: 'center' },
+  otpInput: {
+    borderBottomWidth: 2,
+    borderColor: '#1a73e8',
+    fontSize: 20,
+    width: 40,
+    height: 50,
+    textAlign: 'center',
+    marginHorizontal: 5,
+    color: '#000',
+  },
+  statusIcon: { fontSize: 40, textAlign: 'center', marginTop: 15 },
+  resendText: { textAlign: 'center', marginTop: 10, color: '#666' },
+  resendLink: { textAlign: 'center', marginTop: 10, color: '#1a73e8', fontWeight: '500' },
 });

@@ -1,0 +1,33 @@
+*** a/node_modules/@expo/image-utils/build/jimp.js
+*** b/node_modules/@expo/image-utils/build/jimp.js
+@@
+-// @ts-ignore
+-const jimp_compact_1 = __importDefault(require("jimp-compact"));
++// @ts-ignore
++const Jimp = require("jimp");
+@@
+-const jimpImage = await jimp_compact_1.default.read(buffer);
++const jimpImage = await Jimp.read(buffer);
+@@
+-const image = await new jimp_compact_1.default(size, size, color);
++const image = await new Jimp(size, size, color);
+@@
+-initialImage = initialImage.composite(new jimp_compact_1.default(width, height, background), 0, 0, {
+-    mode: jimp_compact_1.default.BLEND_DESTINATION_OVER,
+-    opacitySource: 1,
+-    opacityDest: 1,
+-});
++initialImage = initialImage.composite(new Jimp(width, height, background), 0, 0, {
++    mode: Jimp.BLEND_DESTINATION_OVER,
++    opacitySource: 1,
++    opacityDest: 1,
++});
+@@
+-return await jimp_compact_1.default.read(input);
++return await Jimp.read(input);
+@@
+-return initialImage.quality(jimpQuality).background(jimp_compact_1.default.cssColorToHex(background));
++return initialImage.quality(jimpQuality).background(Jimp.cssColorToHex(background));
+@@
+-return await new jimp_compact_1.default(size, size, color);
++return await new Jimp(size, size, color);
